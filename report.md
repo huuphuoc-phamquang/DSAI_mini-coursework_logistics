@@ -140,6 +140,20 @@ Trên tập validation (2,005 shipment gần nhất, 226 delay thật), chính s
 
 **Khuyến nghị**: thay bất kỳ cách chọn thủ công/ngẫu nhiên nào bằng risk ranking của mô hình. Với cùng ngân sách 15%, Operations bắt được khoảng 5–6/10 delay thật thay vì ~1.5/10 - mô hình không tốn thêm chi phí vận hành, chỉ giúp nhắm đúng năng lực can thiệp sẵn có vào đúng shipment cần nó.
 
+### 7.1 Độ nhạy Precision/Recall theo ngân sách can thiệp
+
+Ngân sách 15% là ràng buộc cố định từ đề bài, nhưng để hiểu rõ hơn vị trí của nó trên đường cong đánh đổi precision/recall, cùng một model (không train lại) được thử ở 10% và 20%:
+
+| Ngân sách | Flagged | Bắt được delay | Recall | Precision | F1 | Tiết kiệm |
+|---|---|---|---|---|---|---|
+| **10%** | 201 | 102 | 45.1% | 50.7% | 0.478 | £4,590 |
+| **15%** (hiện tại) | 301 | 127 | 56.2% | 42.2% | 0.482 | £5,715 |
+| **20%** | 401 | 149 | 65.9% | 37.2% | 0.475 | £6,705 |
+
+Đánh đổi kinh điển: ở 10%, precision đạt ~50% (gần một nửa shipment bị flag đúng là sẽ trễ); ở 20%, recall tăng lên 65.9% nhưng precision giảm còn 37.2% (gần 2/3 số can thiệp là báo động giả). F1 gần như phẳng (0.478 → 0.482 → 0.475) — không có mức nào áp đảo rõ ràng trên một metric tổng hợp. Số £ tiết kiệm tăng đơn điệu theo ngân sách nhưng dễ gây hiểu lầm: công thức chỉ tính lợi ích khi bắt đúng, không trừ chi phí can thiệp vào các shipment hóa ra vẫn đúng hẹn. Vì 15% là ràng buộc cứng chứ không phải tham số tự do, phân tích này chỉ mang tính đối chiếu — nhưng xác nhận 15% nằm ở vị trí hợp lý giữa hai thái cực.
+
+*(`experiments.ipynb` cho kết quả tương tự về hình dạng đánh đổi, với baseline khác một chút — 10%: 99/226 (43.8%), 15%: 125/226 (55.3%), 20%: 150/226 (66.4%) — do bộ feature ở đó có thêm `route_risk_cluster`.)*
+
 ## 8. *(Chỉ ở `experiments.ipynb`)* Thử nghiệm mở rộng: Blend CatBoost + Logistic Regression
 
 Recall 56.6% (baseline experiments.ipynb) vẫn để lọt gần một nửa số delay thật. Thử blend trung bình có trọng số giữa xác suất dự đoán của LR và CatBoost (recall-tuned), trọng số tune qua CV theo `TimeSeriesSplit`. Kết quả lần này: trọng số tối ưu nghiêng hẳn về CatBoost (`w=0.10`, tức chỉ 10% LR / 90% CatBoost), đạt CV Recall@15% đỉnh 62.1%. Trên validation set thật, blend ở trọng số này cho **130/226 (57.5%)** - cải thiện thật so với baseline (128/226, 56.6%, +£90) và so với LR recall-tuned ở 8.3 (129/226, 57.1%, +£45) - nhưng **trùng khớp tuyệt đối với CatBoost (recall-tuned) một mình**, vì một blend nghiêng 90% về CatBoost gần như không khác gì CatBoost đứng riêng.
